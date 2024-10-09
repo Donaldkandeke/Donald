@@ -50,7 +50,7 @@ if data:
 
     # Button to download the Excel file
     st.download_button(
-        label="📥 Download data in Excel format",
+        label="📥 Download raw data in Excel format",
         data=processed_data,
         file_name="collected_data.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
