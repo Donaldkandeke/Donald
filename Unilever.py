@@ -82,6 +82,10 @@ if data:
         date1 = st.sidebar.date_input("Choose start date")
         date2 = st.sidebar.date_input("Choose end date")
 
+
+        # Convert date1 and date2 to datetime and ensure date2 covers the entire day
+        date1 = pd.to_datetime(date1)
+        date2 = pd.to_datetime(date2) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         # Filter by date
         df_filtered = df_kobo[
             (df_kobo["_submission_time"] >= pd.to_datetime(date1)) & 
