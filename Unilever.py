@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 import folium
-from folium.plugins import MarkerCluster, HeatMap, Draw, Fullscreen
+from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
 import plotly.graph_objs as go
+import plotly.express as px
 import io
 
 # Define the page configuration
@@ -147,42 +148,44 @@ if data:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+    # Checking before displaying the map
+    if not df_filtered[['Latitude', 'Longitude']].isna().all().any():
+        df_filtered = df_filtered.dropna(subset=['Latitude', 'Longitude'])
+        map_center = [df_filtered['Latitude'].mean(), df_filtered['Longitude'].mean()]
+        map_folium = folium.Map(location=map_center, zoom_start=12)
+        marker_cluster = MarkerCluster().add_to(map_folium)
 
-    # Vérifier si les coordonnées de latitude et de longitude contiennent des valeurs NaN
-    if df_filtered['Latitude'].isnull().all() or \
-       df_filtered['Longitude'].isnull().all():
-        st.error("Les coordonnées de localisation sont toutes manquantes.")
+        for _, row in df_filtered.iterrows():
+            folium.Marker(
+                location=[row['Latitude'], row['Longitude']],
+                popup=f"Agent: {row['Name_Agent']}"
+            ).add_to(marker_cluster)
+
+        folium_static(map_folium)
     else:
-        # Calculer les moyennes tout en ignorant les NaN
-        latitude_mean = df_filtered['Latitude'].mean()
-        longitude_mean = df_filtered['Longitude'].mean()
+        st.warning("No valid data to display the map.")
 
-        # Créer une carte avec les coordonnées moyennes des points filtrés
-        m = folium.Map(location=[latitude_mean, longitude_mean], zoom_start=4)
+    # Graphs
+    col1, col2 = st.columns(2)
+    with col1:
+        fig2 = go.Figure(
+            data=[go.Bar(x=df_filtered['Sondage/Sorte_caracteristic'], y=df_filtered['Sondage/PVT'].astype(float))],
+            layout=go.Layout(
+                title=go.layout.Title(text="BUSINESS TYPE BY QUARTILES OF INVESTMENT"),
+                plot_bgcolor='rgba(0, 0, 0, 0)',
+                paper_bgcolor='rgba(0, 0, 0, 0)',
+                xaxis=dict(showgrid=True, gridcolor='#cecdcd'),
+                yaxis=dict(showgrid=True, gridcolor='#cecdcd'),
+                font=dict(color='#cecdcd'),
+            )
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
-        # Ajouter des marqueurs avec des clusters
-        marker_cluster = MarkerCluster().add_to(m)
-        for i, row in df_filtered.iterrows():
-            if pd.notnull(row['Latitude']) and \
-               pd.notnull(row['Longitude']):
-                popup_content = f"""
-                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-                <ul class="list-group">
-                    <h3>Information of {row['Identification/Name_PDV']}</h3>
-                    <hr class='bg-danger text-primary'>
-                    <div style='width:400px;height:200px;margin:10px;color:gray;font-size:18px;'>
-                        <li class="list-group-item"><b>Branch Identification/Type_PDV:</b> {row['Identification/Type_PDV']}</li>
-                        <li class="list-group-item"><b>Province:</b> {row['Identification/Province']}</li>
-                        <li class="list-group-item"><b>Commune:</b> {row['Identification/Commune']}</li>
-                        <li class="list-group-item"><b>Point de vente:</b> {row['Identification/Adresse_PDV']}</li>
-                    </div>
-                </ul>
-                """
-                folium.Marker(
-                    location=[row['Latitude'], row['Longitude']],
-                    popup=popup_content,
-                ).add_to(marker_cluster)
+    with col2:
+        fig = px.pie(df_filtered, values='Sondage/PVT', names='Sondage/Sorte_caracteristic', title='Total Price by Name')
+        fig.update_traces(hole=0.4)
+        fig.update_layout(width=800)
+        st.plotly_chart(fig, use_container_width=True)
 
-        # Utiliser st_folium pour afficher la carte
-        folium_static(m)
-
+else:
+    st.warning("No data to display.")
