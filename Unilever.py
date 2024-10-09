@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import requests
 import folium
@@ -55,22 +55,19 @@ if data:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # Création et transformation des DataFrames GPI et Sondage
-    df_gpi = pd.DataFrame([
-        {'Categorie': 'PERSONAL_CARE', 'Sorte': 'Vaseline_PJs_240ml'},
-        {'Categorie': 'PERSONAL_CARE', 'Sorte': 'Vaseline_PJs_240ml'},
-        {'Categorie': 'PERSONAL_CARE', 'Sorte': 'Vaseline_PJs_240ml'},
-        {'Categorie': 'HOME_CARE', 'Sorte': 'Vim_500g'}
-    ])
+    # Si la colonne GPI contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
+    if 'GPI' in df_kobo.columns:
+        # Extraire les données de la colonne GPI
+        gpi_data = df_kobo['GPI'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
+        df_kobo['GPI_Transformed'] = gpi_data  # Crée une nouvelle colonne avec les données aplaties
+        df_kobo = df_kobo.drop(columns=['GPI'])  # Supprimer l'ancienne colonne GPI
 
-    df_sondage = pd.DataFrame([
-        {'Sorte_caracteristic': 'Royco_8g_Cases', 'PVU': '22000', 'QT': '1', 'PVT': '22000'},
-        {'Sorte_caracteristic': 'Vaseline_PJs_240ml', 'PVU': '11000', 'QT': '2', 'PVT': '22000'}
-    ])
-
-    # Combiner les deux DataFrames et ajouter à df_kobo
-    df_combined = pd.concat([df_gpi, df_sondage], axis=1)
-    df_kobo[['Categorie', 'Sorte', 'Sorte_caracteristic', 'PVU', 'QT', 'PVT']] = df_combined
+    # Si la colonne Sondage contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
+    if 'Sondage' in df_kobo.columns:
+        # Extraire les données de la colonne Sondage
+        sondage_data = df_kobo['Sondage'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
+        df_kobo['Sondage_Transformed'] = sondage_data  # Crée une nouvelle colonne avec les données aplaties
+        df_kobo = df_kobo.drop(columns=['Sondage'])  # Supprimer l'ancienne colonne Sondage
 
     # Vérification et traitement des données GPS
     if 'GPS' in df_kobo.columns:
@@ -105,13 +102,12 @@ if data:
 
         with st.expander("ANALYTICS"):
             a1, a2 = st.columns(2)
-	    # Calculer la somme de la colonne PVT
+            # Calculer la somme de la colonne PVT
             total_price = df_filtered['PVT'].astype(float).sum() if 'PVT' in df_filtered.columns else 0
             # Calculer le prix total
             num_rows = len(df_filtered)  # Utiliser len() pour obtenir le nombre total de lignes
             a1.metric(label="Nombres de PDV", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
             a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
-
 
         # Afficher les données filtrées
         st.subheader("Données Filtrées")
@@ -170,7 +166,5 @@ if data:
             fig.update_layout(width=800)
             st.plotly_chart(fig, use_container_width=True)
 
-    else:
-        st.warning("Aucune donnée valide pour afficher les informations GPS.")
 else:
     st.error("Impossible d'afficher les données, veuillez sélectionner au moins un emplacement commercial.")
