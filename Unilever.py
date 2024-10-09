@@ -32,6 +32,7 @@ headers = {
 
 # Télécharger les données depuis KoboCollect
 data = download_kobo_data(api_url, headers)
+st.success("Données KoboCollect récupérées avec succès !")
 
 if data:
     # Conversion des données JSON en DataFrame
