@@ -39,7 +39,7 @@ if data:
     df_kobo = pd.json_normalize(data['results'])
 
     # Display the data in Streamlit
-    st.subheader("Collected Data")
+    st.subheader("Gross data")
     st.dataframe(df_kobo)  # Display data as a table
 
     # Convert the DataFrame to an Excel file in memory
