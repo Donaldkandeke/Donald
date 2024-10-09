@@ -55,36 +55,19 @@ if data:
         file_name="collected_data.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-    # If the GPI column contains object lists, we will flatten them and turn them into separate columns
+    # Si la colonne GPI contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
     if 'GPI' in df_kobo.columns:
-        # Extract data from the GPI column
+        # Extraire les données de la colonne GPI
         gpi_data = df_kobo['GPI'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
-        df_kobo['GPI_Transformed'] = gpi_data  # Create a new column with the flattened data
-        df_kobo = df_kobo.drop(columns=['GPI'])  # Remove the old GPI column
+        df_kobo['GPI_Transformed'] = gpi_data  # Crée une nouvelle colonne avec les données aplaties
+        df_kobo = df_kobo.drop(columns=['GPI'])  # Supprimer l'ancienne colonne GPI
 
-    # Séparer la colonne 'Sondage' en plusieurs colonnes
-    sondage_split = df_kobo['Sondage'].str.split(' ', expand=True)
-
-    # Vérifier combien de colonnes sont réellement créées
-    num_columns = sondage_split.shape[1]
-    st.write(f"Number of columns created by split: {num_columns}")
-
-    # S'assurer qu'il y a exactement 4 colonnes, et remplir les valeurs manquantes si nécessaire
-    if num_columns < 4:
-        for i in range(4 - num_columns):
-            sondage_split[num_columns + i] = None  # Ajouter des colonnes manquantes avec des valeurs vides
-
-    # Renommer les colonnes avec des noms explicites
-    df_kobo[['Sondage/Sorte_caracteristic', 'Sondage/PVU', 'Sondage/QT', 'Sondage/PVT']] = sondage_split.iloc[:, :4]
-
-    # Convertir les colonnes pertinentes en type numérique (si applicable)
-    df_kobo['Sondage/PVU'] = pd.to_numeric(df_kobo['Sondage/PVU'], errors='coerce')
-    df_kobo['Sondage/QT'] = pd.to_numeric(df_kobo['Sondage/QT'], errors='coerce')
-    df_kobo['Sondage/PVT'] = pd.to_numeric(df_kobo['Sondage/PVT'], errors='coerce')
-
-    # Supprimer la colonne d'origine 'Sondage' si nécessaire
-    df_kobo = df_kobo.drop(columns=['Sondage'])
+    # Si la colonne Sondage contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
+    if 'Sondage' in df_kobo.columns:
+        # Extraire les données de la colonne Sondage
+        sondage_data = df_kobo['Sondage'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
+        df_kobo['Sondage_Transformed'] = sondage_data  # Crée une nouvelle colonne avec les données aplaties
+        df_kobo = df_kobo.drop(columns=['Sondage'])  # Supprimer l'ancienne colonne Sondage
 
     # Checking and processing GPS data
     if 'GPS' in df_kobo.columns:
@@ -130,9 +113,17 @@ if data:
         a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
         a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
 
-    # Display the filtered data
-    with st.expander("Filtered Data"):
-        st.dataframe(df_filtered, use_container_width=True)
+    # Sélectionner des colonnes à afficher et à télécharger
+    columns = st.multiselect("Select the columns you wish to include in the downloaded file :", 
+                             options=df_kobo.columns.tolist(), 
+                             default=df_kobo.columns.tolist())
+
+    # Filtrer les données en fonction des colonnes sélectionnées
+    df_final = df_filtered[columns]
+
+    # Afficher les données filtrées
+    st.subheader("Filtered data")
+    st.dataframe(df_final, use_container_width=True)
 
     # Convert the filtered DataFrame to an Excel file in memory
     output = io.BytesIO()
@@ -171,21 +162,12 @@ if data:
         fig2 = go.Figure(
             data=[go.Bar(x=df_filtered['Sondage/Sorte_caracteristic'], y=df_filtered['Sondage/PVT'].astype(float))],
             layout=go.Layout(
-                title=go.layout.Title(text="BUSINESS TYPE BY QUARTILES OF INVESTMENT"),
-                plot_bgcolor='rgba(0, 0, 0, 0)',
-                paper_bgcolor='rgba(0, 0, 0, 0)',
-                xaxis=dict(showgrid=True, gridcolor='#cecdcd'),
-                yaxis=dict(showgrid=True, gridcolor='#cecdcd'),
-                font=dict(color='#cecdcd'),
+                title=go.layout.Title(text="BUSINESS TYPE BY QUANTITY", font=dict(size=15, family="Arial")),
+                xaxis=dict(title="Business Type"),
+                yaxis=dict(title="Quantity"),
             )
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2)
 
     with col2:
-        fig = px.pie(df_filtered, values='Sondage/PVT', names='Sondage/Sorte_caracteristic', title='Total Price by Name')
-        fig.update_traces(hole=0.4)
-        fig.update_layout(width=800)
-        st.plotly_chart(fig, use_container_width=True)
-
-else:
-    st.warning("No data to display.")
+        st.plotly_chart(px.histogram(df_filtered, x='Sondage/QT', title="Quantity Histogram"))
