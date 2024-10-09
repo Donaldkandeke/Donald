@@ -8,12 +8,12 @@ import plotly.graph_objs as go
 import plotly.express as px
 import io
 
-# Définir la configuration de la page
+# Define the page configuration
 st.set_page_config(page_title="UNILEVER", page_icon="🌍", layout="wide")
 st.header(":bar_chart: Unilever Dashboard")
 st.markdown('<style>div.block-container{padding-top:2rem;}</style>', unsafe_allow_html=True)
 
-# Caching des données pour éviter les appels multiples à l'API
+# Caching data to avoid multiple API calls
 @st.cache_data
 def download_kobo_data(api_url, headers):
     try:
@@ -21,80 +21,80 @@ def download_kobo_data(api_url, headers):
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        st.error(f"Erreur lors de la récupération des données : {e}")
+        st.error(f"Error retrieving the data: {e}")
         return None
 
-# API URL et clé
+# API URL and key
 api_url = "https://kf.kobotoolbox.org/api/v2/assets/amfgmGRANPdTQgh85J7YqK/data/?format=json"
 headers = {
     "Authorization": "Token fd0239896ad338de0651fe082978bec82cc7dad4"
 }
 
-# Télécharger les données depuis KoboCollect
+# Download the data from KoboCollect
 data = download_kobo_data(api_url, headers)
-st.success("Données KoboCollect récupérées avec succès !")
+st.success("KoboCollect data retrieved successfully!")
 
 if data:
-    # Conversion des données JSON en DataFrame
+    # Convert JSON data to DataFrame
     df_kobo = pd.json_normalize(data['results'])
 
-    # Afficher les données dans Streamlit
-    st.subheader("Données collectées")
-    st.dataframe(df_kobo)  # Afficher les données sous forme de tableau
+    # Display the data in Streamlit
+    st.subheader("Collected Data")
+    st.dataframe(df_kobo)  # Display data as a table
 
-    # Convertir le DataFrame en un fichier Excel en mémoire
+    # Convert the DataFrame to an Excel file in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_kobo.to_excel(writer, index=False)
     processed_data = output.getvalue()
 
-    # Bouton pour télécharger le fichier Excel
+    # Button to download the Excel file
     st.download_button(
-        label="📥 Télécharger les données en format Excel",
+        label="📥 Download data in Excel format",
         data=processed_data,
-        file_name="donnees_collectees.xlsx",
+        file_name="collected_data.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # Si la colonne GPI contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
+    # If the GPI column contains object lists, we will flatten them and turn them into separate columns
     if 'GPI' in df_kobo.columns:
-        # Extraire les données de la colonne GPI
+        # Extract data from the GPI column
         gpi_data = df_kobo['GPI'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
-        df_kobo['GPI_Transformed'] = gpi_data  # Crée une nouvelle colonne avec les données aplaties
-        df_kobo = df_kobo.drop(columns=['GPI'])  # Supprimer l'ancienne colonne GPI
+        df_kobo['GPI_Transformed'] = gpi_data  # Create a new column with the flattened data
+        df_kobo = df_kobo.drop(columns=['GPI'])  # Remove the old GPI column
 
-    # Si la colonne Sondage contient des listes d'objets, on va les aplatir et les transformer en colonnes séparées
+    # If the Survey column contains object lists, we will flatten them and turn them into separate columns
     if 'Sondage' in df_kobo.columns:
-        # Extraire les données de la colonne Sondage
+        # Extract data from the Survey column
         sondage_data = df_kobo['Sondage'].apply(lambda x: ', '.join([str(obj) if isinstance(obj, dict) else str(obj) for obj in x]) if isinstance(x, list) else x)
-        df_kobo['Sondage_Transformed'] = sondage_data  # Crée une nouvelle colonne avec les données aplaties
-        df_kobo = df_kobo.drop(columns=['Sondage'])  # Supprimer l'ancienne colonne Sondage
+        df_kobo['Sondage_Transformed'] = sondage_data  # Create a new column with the flattened data
+        df_kobo = df_kobo.drop(columns=['Sondage'])  # Remove the old Survey column
 
-    # Vérification et traitement des données GPS
+    # Checking and processing GPS data
     if 'GPS' in df_kobo.columns:
         gps_split = df_kobo['GPS'].str.split(' ', expand=True)
-        df_kobo[['Latitude', 'Longitude', 'Altitude', 'Autre']] = gps_split.astype(float)
+        df_kobo[['Latitude', 'Longitude', 'Altitude', 'Other']] = gps_split.astype(float)
 
-        # Convertir la colonne des dates
+        # Convert the date column
         df_kobo["_submission_time"] = pd.to_datetime(df_kobo["_submission_time"])
 
-        # Entrée pour la sélection des dates
-        date1 = st.sidebar.date_input("Choisissez la date de début")
-        date2 = st.sidebar.date_input("Choisissez la date de fin")
+        # Input for date selection
+        date1 = st.sidebar.date_input("Choose start date")
+        date2 = st.sidebar.date_input("Choose end date")
 
-        # Filtrer par date
+        # Filter by date
         df_filtered = df_kobo[
             (df_kobo["_submission_time"] >= pd.to_datetime(date1)) & 
             (df_kobo["_submission_time"] <= pd.to_datetime(date2))
         ]
 
-        # Sidebar pour les filtres supplémentaires
-        st.sidebar.header("Choisissez vos filtres:")
+        # Sidebar for additional filters
+        st.sidebar.header("Choose your filters:")
         filters = {
-            "Identification/Province": st.sidebar.multiselect("Choisissez votre Province", df_filtered["Identification/Province"].unique()),
-            "Identification/Commune": st.sidebar.multiselect("Choisir la commune", df_filtered["Identification/Commune"].unique()),
-            "Identification/Adresse_PDV": st.sidebar.multiselect("Choisir l'avenue", df_filtered["Identification/Adresse_PDV"].unique()),
-            "Name_Agent": st.sidebar.multiselect("Choisir le Nom et prénom", df_filtered["Name_Agent"].unique())
+            "Identification/Province": st.sidebar.multiselect("Choose your Province", df_filtered["Identification/Province"].unique()),
+            "Identification/Commune": st.sidebar.multiselect("Choose the commune", df_filtered["Identification/Commune"].unique()),
+            "Identification/Adresse_PDV": st.sidebar.multiselect("Choose the avenue", df_filtered["Identification/Adresse_PDV"].unique()),
+            "Name_Agent": st.sidebar.multiselect("Choose Name and Surname", df_filtered["Name_Agent"].unique())
         }
 
         for col, selection in filters.items():
@@ -103,32 +103,32 @@ if data:
 
         with st.expander("ANALYTICS"):
             a1, a2 = st.columns(2)
-            # Calculer la somme de la colonne PVT
+            # Calculate the sum of the PVT column
             total_price = df_filtered['PVT'].astype(float).sum() if 'PVT' in df_filtered.columns else 0
-            # Calculer le prix total
-            num_rows = len(df_filtered)  # Utiliser len() pour obtenir le nombre total de lignes
-            a1.metric(label="Nombres de PDV", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
+            # Calculate the total price
+            num_rows = len(df_filtered)  # Use len() to get the total number of rows
+            a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
             a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
 
-        # Afficher les données filtrées
-        st.subheader("Données Filtrées")
+        # Display the filtered data
+        st.subheader("Filtered Data")
         st.dataframe(df_filtered, use_container_width=True)
 
-        # Convertir le DataFrame filtré en un fichier Excel en mémoire
+        # Convert the filtered DataFrame to an Excel file in memory
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_filtered.to_excel(writer, index=False)
         processed_data = output.getvalue()
 
-        # Bouton pour télécharger les données filtrées en format Excel
+        # Button to download the filtered data in Excel format
         st.download_button(
-            label="📥 Télécharger les données filtrées en format Excel",
+            label="📥 Download filtered data in Excel format",
             data=processed_data,
-            file_name="données_filtrées.xlsx",
+            file_name="filtered_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # Vérification avant d'afficher la carte
+        # Checking before displaying the map
         if not df_filtered[['Latitude', 'Longitude']].isna().all().any():
             df_filtered = df_filtered.dropna(subset=['Latitude', 'Longitude'])
             map_center = [df_filtered['Latitude'].mean(), df_filtered['Longitude'].mean()]
@@ -143,9 +143,9 @@ if data:
 
             folium_static(map_folium)
         else:
-            st.warning("Aucune donnée valide pour afficher la carte.")
+            st.warning("No valid data to display the map.")
 
-        # Graphiques
+        # Graphs
         col1, col2 = st.columns(2)
         with col1:
             fig2 = go.Figure(
@@ -168,4 +168,4 @@ if data:
             st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.error("Impossible d'afficher les données, veuillez sélectionner au moins un emplacement commercial.")
+    st.error("Unable to display the data, please select at least one commercial location.")
