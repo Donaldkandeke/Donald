@@ -143,10 +143,9 @@ if not df_filtered[['Latitude', 'Longitude']].isna().all().any():
 
     folium_static(map_folium)
 else:
-    st.warning(
-        "Les agents envoient automatiquement les données lors de la prise de données. "
-        "Cela nous permet de suivre leur progression en temps réel et d'identifier les éventuelles erreurs rapidement. "
-        "Veuillez revenir plus tard pour visualiser les mises à jour."
+    st.warning("Les agents envoient automatiquement les données lors de la prise de données. 
+                Cela nous permet de suivre leur progression en temps réel et d'identifier les éventuelles erreurs rapidement. 
+                Veuillez revenir plus tard pour visualiser les mises à jour."
     )
 
 # Graphs
