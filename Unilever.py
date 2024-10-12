@@ -175,13 +175,25 @@ if data:
         # Graphs
         col1, col2 = st.columns(2)
 
-        with col1:
-            # Create a pie chart for Type_PDV
-            if 'Identification/Type_PDV' in df_filtered.columns:
-                st.subheader("Pie chart of Type_PDV")
-                pie_chart_data = df_filtered['Identification/Type_PDV'].value_counts()
-                fig = px.pie(pie_chart_data, values=pie_chart_data.values, names=pie_chart_data.index, title="Pie chart of Type_PDV")
-                st.plotly_chart(fig)
+with col1:
+    # Create a pie chart for Type_PDV
+    if 'Identification/Type_PDV' in df_filtered.columns:
+        st.subheader("Pie chart of Type_PDV (Number of Occurrences)")
+        pie_chart_data = df_filtered['Identification/Type_PDV'].value_counts()
+        fig = px.pie(
+            pie_chart_data, 
+            values=pie_chart_data.values,  # Number of occurrences
+            names=pie_chart_data.index,    # Categories (Type_PDV)
+            title="Pie chart of Type_PDV",
+            hole=0.3,                      # Optionally make it a donut chart
+        )
+        
+        # Show only the numbers (occurrences) without the category labels
+        fig.update_traces(textinfo='value', textposition='inside')  # Only display the value (occurrences)
+        
+        st.plotly_chart(fig)
+
+
 
 with col2:
     # Create a bar chart for Name_Agent
