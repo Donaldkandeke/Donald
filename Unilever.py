@@ -40,9 +40,9 @@ headers = {
 
 # Download the data from KoboCollect
 data = download_kobo_data(api_url, headers)
-st.success("KoboCollect data retrieved successfully!")
-
 if data:
+    st.success("KoboCollect data retrieved successfully!")
+
     # Convert JSON data to DataFrame
     df_kobo = pd.json_normalize(data['results'])
 
@@ -63,7 +63,7 @@ if data:
         file_name="collected_data.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    
+
     # Process GPI column if present
     if 'GPI' in df_kobo.columns:
         gpi_data = df_kobo['GPI'].apply(lambda x: ', '.join([str(obj) for obj in x]) if isinstance(x, list) else x)
@@ -94,8 +94,8 @@ if data:
 
     # Filter by date
     df_filtered = df_kobo[
-        (df_kobo["_submission_time"] >= pd.to_datetime(date1)) & 
-        (df_kobo["_submission_time"] <= pd.to_datetime(date2))
+        (df_kobo["_submission_time"] >= date1) & 
+        (df_kobo["_submission_time"] <= date2)
     ]
 
     # Sidebar for additional filters
@@ -111,15 +111,28 @@ if data:
         if selection:
             df_filtered = df_filtered[df_filtered[col].isin(selection)]
 
-    with st.expander("ANALYTICS"):
-        a1, a2 = st.columns(2)
-        total_price = df_filtered['Sondage/PVT'].astype(float).sum() if 'Sondage/PVT' in df_filtered.columns else 0
+# Bloc analytique pour afficher le nombre de PDVs et le Total Price
+with st.expander("ANALYTICS"):
+    a1, a2 = st.columns(2)
+
+    # Vérifier si 'Sondage_Transformed' existe dans le DataFrame
+    if 'Sondage_Transformed' in df_filtered.columns:
+        # Convertir la colonne 'Sondage_Transformed' en numérique pour Sondage/PVT
+        df_filtered['Sondage/PVT'] = pd.to_numeric(df_filtered['Sondage_Transformed'], errors='coerce')
+
+        # Calcul du prix total (somme de 'Sondage/PVT')
+        total_price = df_filtered['Sondage/PVT'].sum()  # Somme des valeurs de Sondage/PVT
         num_rows = len(df_filtered)
+
+        # Affichage des métriques pour le nombre de points de vente (PDVs) et le prix total
         a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
         a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
 
+    else:
+        st.error("La colonne 'Sondage_Transformed' n'existe pas dans le DataFrame filtré.")
+
     # Sélectionner des colonnes à afficher et à télécharger
-    columns = st.multiselect("Select the columns you wish to include in the downloaded file :", 
+    columns = st.multiselect("Select the columns you wish to include in the downloaded file:", 
                              options=df_kobo.columns.tolist(), 
                              default=df_kobo.columns.tolist())
 
@@ -133,7 +146,7 @@ if data:
     # Convert the filtered DataFrame to an Excel file in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_filtered.to_excel(writer, index=False)
+        df_final.to_excel(writer, index=False)
     processed_data = output.getvalue()
 
     # Button to download the filtered data in Excel format
@@ -164,15 +177,19 @@ if data:
     # Graphs
     col1, col2 = st.columns(2)
     with col1:
-        fig2 = go.Figure(
-            data=[go.Bar(x=df_filtered['Sondage/Sorte_caracteristic'], y=df_filtered['Sondage/PVT'].astype(float))],
-            layout=go.Layout(
-                title=go.layout.Title(text="BUSINESS TYPE BY QUANTITY", font=dict(size=15, family="Arial")),
-                xaxis=dict(title="Business Type"),
-                yaxis=dict(title="Quantity"),
-            )
-        )
-        st.plotly_chart(fig2)
+        # Create a bar chart for selected columns
+        if len(columns) > 0:
+            st.subheader("Bar chart of selected columns")
+            selected_column = st.selectbox("Select a column to display", columns)
+            bar_chart_data = df_filtered[selected_column].value_counts()
+            fig = px.bar(bar_chart_data, x=bar_chart_data.index, y=bar_chart_data.values, labels={'x': selected_column, 'y': 'Counts'})
+            st.plotly_chart(fig)
 
     with col2:
-        st.plotly_chart(px.histogram(df_filtered, x='Sondage/QT', title="Quantity Histogram"))
+        # Create a pie chart for the same selected column
+        if len(columns) > 0:
+            st.subheader("Pie chart of selected column")
+            selected_column = st.selectbox("Select a column for the pie chart", columns)
+            pie_chart_data = df_filtered[selected_column].value_counts()
+            fig = px.pie(pie_chart_data, values=pie_chart_data.values, names=pie_chart_data.index, title=f"Distribution of {selected_column}")
+            st.plotly_chart(fig)
