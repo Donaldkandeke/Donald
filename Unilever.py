@@ -6,7 +6,6 @@ from urllib3.util.retry import Retry
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
-import plotly.graph_objs as go
 import plotly.express as px
 import io
 
@@ -111,85 +110,90 @@ if data:
         if selection:
             df_filtered = df_filtered[df_filtered[col].isin(selection)]
 
-# Bloc analytique pour afficher le nombre de PDVs et le Total Price
-with st.expander("ANALYTICS"):
-    a1, a2 = st.columns(2)
+    # Bloc analytique pour afficher le nombre de PDVs et le Total Price
+    with st.expander("ANALYTICS"):
+        a1, a2 = st.columns(2)
 
-    # Vérifier si 'Sondage_Transformed' existe dans le DataFrame
-    if 'Sondage_Transformed' in df_filtered.columns:
-        # Convertir la colonne 'Sondage_Transformed' en numérique pour Sondage/PVT
-        df_filtered['Sondage/PVT'] = pd.to_numeric(df_filtered['Sondage_Transformed'], errors='coerce')
+        # Vérifier si 'Sondage_Transformed' existe dans le DataFrame
+        if 'Sondage_Transformed' in df_filtered.columns:
+            # Convertir la colonne 'Sondage_Transformed' en numérique pour Sondage/PVT
+            df_filtered['Sondage/PVT'] = pd.to_numeric(df_filtered['Sondage_Transformed'], errors='coerce')
 
-        # Calcul du prix total (somme de 'Sondage/PVT')
-        total_price = df_filtered['Sondage/PVT'].sum()  # Somme des valeurs de Sondage/PVT
-        num_rows = len(df_filtered)
+            # Calcul du prix total (somme de 'Sondage/PVT')
+            total_price = df_filtered['Sondage/PVT'].sum()  # Somme des valeurs de Sondage/PVT
+            num_rows = len(df_filtered)
 
-        # Affichage des métriques pour le nombre de points de vente (PDVs) et le prix total
-        a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
-        a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
+            # Affichage des métriques pour le nombre de points de vente (PDVs) et le prix total
+            a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
+            a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
+        else:
+            st.error("La colonne 'Sondage_Transformed' n'existe pas dans le DataFrame filtré.")
 
-    else:
-        st.error("La colonne 'Sondage_Transformed' n'existe pas dans le DataFrame filtré.")
+        # Sélectionner des colonnes à afficher et à télécharger
+        columns = st.multiselect("Select the columns you wish to include in the downloaded file:", 
+                                 options=df_kobo.columns.tolist(), 
+                                 default=df_kobo.columns.tolist())
 
-    # Sélectionner des colonnes à afficher et à télécharger
-    columns = st.multiselect("Select the columns you wish to include in the downloaded file:", 
-                             options=df_kobo.columns.tolist(), 
-                             default=df_kobo.columns.tolist())
+        # Filtrer les données en fonction des colonnes sélectionnées
+        df_final = df_filtered[columns]
 
-    # Filtrer les données en fonction des colonnes sélectionnées
-    df_final = df_filtered[columns]
+        # Afficher les données filtrées
+        st.subheader("Filtered data")
+        st.dataframe(df_final, use_container_width=True)
 
-    # Afficher les données filtrées
-    st.subheader("Filtered data")
-    st.dataframe(df_final, use_container_width=True)
+        # Convert the filtered DataFrame to an Excel file in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_final.to_excel(writer, index=False)
+        processed_data = output.getvalue()
 
-    # Convert the filtered DataFrame to an Excel file in memory
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_final.to_excel(writer, index=False)
-    processed_data = output.getvalue()
+        # Button to download the filtered data in Excel format
+        st.download_button(
+            label="📥 Download filtered data in Excel format",
+            data=processed_data,
+            file_name="filtered_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-    # Button to download the filtered data in Excel format
-    st.download_button(
-        label="📥 Download filtered data in Excel format",
-        data=processed_data,
-        file_name="filtered_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+        # Checking before displaying the map
+        if not df_filtered[['Latitude', 'Longitude']].isna().all().any():
+            df_filtered = df_filtered.dropna(subset=['Latitude', 'Longitude'])
+            map_center = [df_filtered['Latitude'].mean(), df_filtered['Longitude'].mean()]
+            map_folium = folium.Map(location=map_center, zoom_start=12)
+            marker_cluster = MarkerCluster().add_to(map_folium)
 
-    # Checking before displaying the map
-    if not df_filtered[['Latitude', 'Longitude']].isna().all().any():
-        df_filtered = df_filtered.dropna(subset=['Latitude', 'Longitude'])
-        map_center = [df_filtered['Latitude'].mean(), df_filtered['Longitude'].mean()]
-        map_folium = folium.Map(location=map_center, zoom_start=12)
-        marker_cluster = MarkerCluster().add_to(map_folium)
+            for _, row in df_filtered.iterrows():
+                folium.Marker(
+                    location=[row['Latitude'], row['Longitude']],
+                    popup=f"Agent: {row['Name_Agent']}"
+                ).add_to(marker_cluster)
 
-        for _, row in df_filtered.iterrows():
-            folium.Marker(
-                location=[row['Latitude'], row['Longitude']],
-                popup=f"Agent: {row['Name_Agent']}"
-            ).add_to(marker_cluster)
+            folium_static(map_folium)
+        else:
+            st.warning("No valid data to display the map.")
 
-        folium_static(map_folium)
-    else:
-        st.warning("No valid data to display the map.")
+        # Graphs
+        col1, col2 = st.columns(2)
 
-    # Graphs
-    col1, col2 = st.columns(2)
-    with col1:
-        # Create a bar chart for selected columns
-        if len(columns) > 0:
-            st.subheader("Bar chart of selected columns")
-            selected_column = st.selectbox("Select a column to display", columns)
-            bar_chart_data = df_filtered[selected_column].value_counts()
-            fig = px.bar(bar_chart_data, x=bar_chart_data.index, y=bar_chart_data.values, labels={'x': selected_column, 'y': 'Counts'})
-            st.plotly_chart(fig)
+        with col1:
+            # Create a pie chart for Type_PDV
+            if 'Identification/Type_PDV' in df_filtered.columns:
+                st.subheader("Pie chart of Type_PDV")
+                pie_chart_data = df_filtered['Identification/Type_PDV'].value_counts()
+                fig = px.pie(pie_chart_data, values=pie_chart_data.values, names=pie_chart_data.index, title="Pie chart of Type_PDV")
+                st.plotly_chart(fig)
 
-    with col2:
-        # Create a pie chart for the same selected column
-        if len(columns) > 0:
-            st.subheader("Pie chart of selected column")
-            selected_column = st.selectbox("Select a column for the pie chart", columns)
-            pie_chart_data = df_filtered[selected_column].value_counts()
-            fig = px.pie(pie_chart_data, values=pie_chart_data.values, names=pie_chart_data.index, title=f"Distribution of {selected_column}")
-            st.plotly_chart(fig)
+with col2:
+    # Create a bar chart for Name_Agent
+    if 'Name_Agent' in df_filtered.columns:
+        st.subheader("Bar chart of Agents")
+        bar_chart_data = df_filtered['Name_Agent'].value_counts()
+        fig = px.bar(
+            bar_chart_data, 
+            x=bar_chart_data.index,  # Names of agents (categories)
+            y=bar_chart_data.values,  # Count of each agent
+            labels={'x': 'Name_Agent', 'y': 'Count'},  # Label for x and y axis
+            title="Bar chart of Agents"
+        )
+        st.plotly_chart(fig)
+
