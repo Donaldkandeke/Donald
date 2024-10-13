@@ -24,7 +24,7 @@ session.mount('https://', adapter)
 @st.cache_data
 def download_kobo_data(api_url, headers):
     try:
-        response = session.get(api_url, headers=headers, timeout=10)
+        response = session.get(api_url, headers=headers, timeout=30)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
