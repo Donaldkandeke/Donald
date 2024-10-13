@@ -49,20 +49,6 @@ if data:
     with st.expander("Gross data"):
         st.dataframe(df_kobo)  # Display data as a table
 
-    # Convert the DataFrame to an Excel file in memory
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_kobo.to_excel(writer, index=False)
-    processed_data = output.getvalue()
-
-    # Button to download the Excel file
-    st.download_button(
-        label="📥 Download raw data in Excel format",
-        data=processed_data,
-        file_name="collected_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
     # Process GPI column if present
     if 'GPI' in df_kobo.columns:
         gpi_data = df_kobo['GPI'].apply(lambda x: ', '.join([str(obj) for obj in x]) if isinstance(x, list) else x)
@@ -123,9 +109,13 @@ if data:
             total_price = df_filtered['Sondage/PVT'].sum()  # Somme des valeurs de Sondage/PVT
             num_rows = len(df_filtered)
 
+            # Conversion des types pour éviter TypeError dans st.metric
+            total_price = float(total_price)
+            num_rows = int(num_rows)
+
             # Affichage des métriques pour le nombre de points de vente (PDVs) et le prix total
-            a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}", delta=total_price)
-            a2.metric(label="Total Price", value=total_price, help=f"Total Price: {total_price}", delta=total_price)
+            a1.metric(label="Number of PDVs", value=num_rows, help=f"Total Price: {total_price}")
+            a2.metric(label="Total Price", value=total_price)
         else:
             st.error("La colonne 'Sondage_Transformed' n'existe pas dans le DataFrame filtré.")
 
@@ -175,37 +165,34 @@ if data:
         # Graphs
         col1, col2 = st.columns(2)
 
-with col1:
-    # Create a pie chart for Type_PDV
-    if 'Identification/Type_PDV' in df_filtered.columns:
-        st.subheader("Pie chart of Type_PDV (Number of Occurrences)")
-        pie_chart_data = df_filtered['Identification/Type_PDV'].value_counts()
-        fig = px.pie(
-            pie_chart_data, 
-            values=pie_chart_data.values,  # Number of occurrences
-            names=pie_chart_data.index,    # Categories (Type_PDV)
-            title="Pie chart of Type_PDV",
-            hole=0.3,                      # Optionally make it a donut chart
-        )
-        
-        # Show only the numbers (occurrences) without the category labels
-        fig.update_traces(textinfo='value', textposition='inside')  # Only display the value (occurrences)
-        
-        st.plotly_chart(fig)
+        with col1:
+            # Create a pie chart for Type_PDV
+            if 'Identification/Type_PDV' in df_filtered.columns:
+                st.subheader("Pie chart of Type_PDV (Number of Occurrences)")
+                pie_chart_data = df_filtered['Identification/Type_PDV'].value_counts()
+                fig = px.pie(
+                    pie_chart_data, 
+                    values=pie_chart_data.values,  # Number of occurrences
+                    names=pie_chart_data.index,    # Categories (Type_PDV)
+                    title="Pie chart of Type_PDV",
+                    hole=0.3,                      # Optionally make it a donut chart
+                )
 
+                # Show only the numbers (occurrences) without the category labels
+                fig.update_traces(textinfo='value', textposition='inside')  # Only display the value (occurrences)
 
+                st.plotly_chart(fig)
 
-with col2:
-    # Create a bar chart for Name_Agent
-    if 'Name_Agent' in df_filtered.columns:
-        st.subheader("Bar chart of Agents")
-        bar_chart_data = df_filtered['Name_Agent'].value_counts()
-        fig = px.bar(
-            bar_chart_data, 
-            x=bar_chart_data.index,  # Names of agents (categories)
-            y=bar_chart_data.values,  # Count of each agent
-            labels={'x': 'Name_Agent', 'y': 'Count'},  # Label for x and y axis
-            title="Bar chart of Agents"
-        )
-        st.plotly_chart(fig)
-
+        with col2:
+            # Create a bar chart for Name_Agent
+            if 'Name_Agent' in df_filtered.columns:
+                st.subheader("Bar chart of Agents")
+                bar_chart_data = df_filtered['Name_Agent'].value_counts()
+                fig = px.bar(
+                    bar_chart_data,
+                    x=bar_chart_data.index,     # Names of agents
+                    y=bar_chart_data.values,    # Number of occurrences
+                    labels={"x": "Agent Name", "y": "Number of Occurrences"},
+                    title="Bar chart of Agents",
+                )
+                st.plotly_chart(fig)
