@@ -35,10 +35,8 @@ def download_kobo_data(api_url, headers):
 api_url = "https://kf.kobotoolbox.org/api/v2/assets/amfgmGRANPdTQgh85J7YqK/data/?format=json"
 headers = {"Authorization": "Token fd0239896ad338de0651fe082978bec82cc7dad4"}
 
-# Téléchargement des données avec un message de chargement
-with st.spinner('Chargement des données, merci de patienter...'):
-    data = download_kobo_data(api_url, headers)
-
+# Télécharger les données de KoboCollect
+data = download_kobo_data(api_url, headers)
 if data:
     st.success("Données KoboCollect récupérées avec succès!")
 
