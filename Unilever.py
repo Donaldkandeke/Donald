@@ -87,24 +87,12 @@ if data:
     with st.expander("Analyses"):
         a1, a2 = st.columns(2)
 
-        # Traitement de la colonne Sondage_Transformed
         if 'Sondage_Transformed' in df_filtered.columns:
-            # Séparer les réponses groupées dans Sondage_Transformed
-            df_filtered['Sondage_Transformed'] = df_filtered['Sondage_Transformed'].str.split(', ')
-            # Exploser la colonne pour obtenir une ligne par réponse
-            reponses = df_filtered.explode('Sondage_Transformed')
-            # Compter les occurrences de chaque réponse
-            occurrences = reponses['Sondage_Transformed'].value_counts()
-
-            # Afficher les métriques
-            total_responses = occurrences.sum()
-            unique_responses = occurrences.count()
-            a1.metric(label="Nombre total de réponses", value=total_responses)
-            a2.metric(label="Nombre unique de réponses", value=unique_responses)
-
-            # Graphique à barres avec Plotly
-            fig = px.bar(occurrences, x=occurrences.index, y=occurrences.values, labels={'x': 'Réponses', 'y': 'Occurrences'}, title="Occurrences des réponses dans Sondage_Transformed")
-            st.plotly_chart(fig)
+            df_filtered['Sondage/PVT'] = pd.to_numeric(df_filtered['Sondage_Transformed'], errors='coerce')
+            total_price = df_filtered['Sondage/PVT'].sum()
+            num_rows = len(df_filtered)
+            a1.metric(label="Nombre de PDVs", value=num_rows)
+            a2.metric(label="Prix total", value=total_price)
         else:
             st.error("La colonne 'Sondage_Transformed' est manquante.")
 
@@ -144,7 +132,7 @@ if data:
     else:
         st.warning("Pas de données GPS valides pour afficher la carte.")
 
-    # Graphiques supplémentaires
+    # Graphiques
     col1, col2 = st.columns(2)
 
     with col1:
