@@ -24,7 +24,7 @@ session.mount('https://', adapter)
 @st.cache_data
 def download_kobo_data(api_url, headers):
     try:
-        response = session.get(api_url, headers=headers, timeout=10)
+        response = session.get(api_url, headers=headers, timeout=30)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -73,10 +73,10 @@ if data:
     # Filtres supplémentaires
     st.sidebar.header("Filtres supplémentaires :")
     filters = {
-        "Identification/Province": st.sidebar.multiselect("Province", sorted(df_filtered["Identification/Province"].unique())),
-        "Identification/Commune": st.sidebar.multiselect("Commune", sorted(df_filtered["Identification/Commune"].unique())),
-        "Identification/Adresse_PDV": st.sidebar.multiselect("Avenue", sorted(df_filtered["Identification/Adresse_PDV"].unique())),
-        "Name_Agent": st.sidebar.multiselect("Agent", sorted(df_filtered["Name_Agent"].unique()))
+        "Identification/Province": st.sidebar.multiselect("Province", df_filtered["Identification/Province"].unique()),
+        "Identification/Commune": st.sidebar.multiselect("Commune", df_filtered["Identification/Commune"].unique()),
+        "Identification/Adresse_PDV": st.sidebar.multiselect("Avenue", df_filtered["Identification/Adresse_PDV"].unique()),
+        "Name_Agent": st.sidebar.multiselect("Agent", df_filtered["Name_Agent"].unique())
     }
 
     for col, selection in filters.items():
@@ -87,12 +87,24 @@ if data:
     with st.expander("Analyses"):
         a1, a2 = st.columns(2)
 
+        # Traitement de la colonne Sondage_Transformed
         if 'Sondage_Transformed' in df_filtered.columns:
-            df_filtered['Sondage/PVT'] = pd.to_numeric(df_filtered['Sondage_Transformed'], errors='coerce')
-            total_price = df_filtered['Sondage/PVT'].sum()
-            num_rows = len(df_filtered)
-            a1.metric(label="Nombre de PDVs", value=num_rows)
-            a2.metric(label="Prix total", value=total_price)
+            # Séparer les réponses groupées dans Sondage_Transformed
+            df_filtered['Sondage_Transformed'] = df_filtered['Sondage_Transformed'].str.split(', ')
+            # Exploser la colonne pour obtenir une ligne par réponse
+            reponses = df_filtered.explode('Sondage_Transformed')
+            # Compter les occurrences de chaque réponse
+            occurrences = reponses['Sondage_Transformed'].value_counts()
+
+            # Afficher les métriques
+            total_responses = occurrences.sum()
+            unique_responses = occurrences.count()
+            a1.metric(label="Nombre total de réponses", value=total_responses)
+            a2.metric(label="Nombre unique de réponses", value=unique_responses)
+
+            # Graphique à barres avec Plotly
+            fig = px.bar(occurrences, x=occurrences.index, y=occurrences.values, labels={'x': 'Réponses', 'y': 'Occurrences'}, title="Occurrences des réponses dans Sondage_Transformed")
+            st.plotly_chart(fig)
         else:
             st.error("La colonne 'Sondage_Transformed' est manquante.")
 
@@ -132,7 +144,7 @@ if data:
     else:
         st.warning("Pas de données GPS valides pour afficher la carte.")
 
-    # Graphiques
+    # Graphiques supplémentaires
     col1, col2 = st.columns(2)
 
     with col1:
